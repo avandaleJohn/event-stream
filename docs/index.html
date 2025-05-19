@@ -63,12 +63,12 @@
 <p>Multiple processes were attempting to answer similar “change” questions using contradictory logic.</p>
 <p>The intention of the event stream was to build a single source of truth that could publish what happened, as it happened; and then notify products of the exact changes that had occurred.</p>
 <p>There are currently 6 products within the Quest eco-system that use the EventStream today in production to respond to changes as they occur:</p>
-<p>AssignmentAudit</p>
-<p>ConfidentialAccess</p>
-<p>PersonReadModel</p>
-<p>QuestReports</p>
-<p>Restrictions</p>
-<p>SOLR</p>
+<p><b>AssignmentAudit</b></p>
+<p><b>ConfidentialAccess</b></p>
+<p><b>PersonReadModel</b></p>
+<p><b>QuestReports</b></p>
+<p><b>Restrictions</b></p>
+<p><b>SOLR</b></p>
 <br/>
 <h2>How the EventStream is produced</h2>
 <h3>How its built</h3>
@@ -85,6 +85,81 @@
 <h2>Breakdown of each column and its purpose</h2>
 <p>There are 9 columns in each event, and they all serve equally important purposes</p>
 <br/>
+
+
+
+<table border="1" cellpadding="5" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Column</th>
+        <th>Purpose</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Id</td>
+        <td>The uniqueid of the event in this table</td>
+        <td>Allows us to identify the event</td>
+      </tr>
+      <tr>
+        <td>EventType</td>
+        <td>Can be one of 3 types – Insert, Update, Delete</td>
+        <td>Tells us what type of change occurred</td>
+      </tr>
+      <tr>
+        <td>TransactionTable</td>
+        <td>The name of the table as it is in the source database</td>
+        <td>Tells us which table the event occurred against</td>
+      </tr>
+      <tr>
+        <td>TransactionTableRow</td>
+        <td>The primarykey id of the row in the source table</td>
+        <td>Tells us the UniqueKey for the row</td>
+      </tr>
+      <tr>
+        <td>ChangeSet</td>
+        <td>A json structure representing the change that took place</td>
+        <td>
+          Tells us what has changed. If the EventType is an Insert, we see everything added in the row under “New” since all data in the row is new. Vice Versa for a delete. For an update, we see before and after value for each column that had data change.
+        </td>
+      </tr>
+      <tr>
+        <td>EmployeeId</td>
+        <td>Who made the change</td>
+        <td>Who made the change</td>
+      </tr>
+      <tr>
+        <td>TriggerInvokeTimestamp</td>
+        <td>When the change was made</td>
+        <td>When the change was performed in the quest database</td>
+      </tr>
+      <tr>
+        <td>TransactionId</td>
+        <td>The correlationid of the change</td>
+        <td>This id allows us to see what else was changed as part of the same transaction</td>
+      </tr>
+      <tr>
+        <td>AffectedEntities</td>
+        <td>
+          The root entities that sit at the highest level relationship (Person, Company, Assignment). Pretty much every change navigates back to at least one of these
+        </td>
+        <td>
+          Usually changes are weighted around root entities (e.g. which person, what company etc)
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+
+
+
+
+
+
+
+
+
 <h3>ChangeSet and Affected entities examples</h3>
 <p>The following example comes from a real record created on April 5th, 2020.</p>
 <br/>
