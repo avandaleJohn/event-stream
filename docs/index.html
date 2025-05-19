@@ -276,11 +276,12 @@
 <p>To use DMS, we enable CDC on the Quest database and create a replication task that replicates the rows from the EventStream onto Kinesis, using a Replication Instance.</p>
 <p>Database Migration Service uses an EC2 service with an AWS agent dependent upon the type of task that is being invoked. It offers the T2 ($0.036 -$0.292 per hour multi-AZ), C4 ($0.308-$2.47) and R4 ($0.41-$6.60) classes for the Replication Instance.  DMS documentation is unclear on the size of instance that should be used in production.  However, it recommends T2 for dev and QA environments.</p>
 <p>The storage of the replication instance is used for caching of transaction log data for long running transactions. The rate at which the DMS can process the events is tied heavily to the size of instance chosen.  However, if the DMS is overwhelmed, it simply pauses reading from the transaction log of the source database until it has caught up.</p>
-<p>We may be ok with T2 for production grade replication of the event stream as we would be reading from a single table which is resource constrained to a single thread; additionally, there is no complicated mapping of the records.  We are simply packaging each row from the database table into a Kinesis record, which would be less memory intensive that if we were manipulating the structure of the payloads.</p>
-<p>Storage is charged at $0.23 per gb per month in a multi AZ instance.  For a T2 instance, the storage size is 50Gb (so, $11.50 per month)</p>
-<p>Due to the relatively low data volumes coming from quest, we can extrapolate that at 5 events per second, we would reach 13 million in a month.  This would be 25% higher than any month so far.</p>
-<p>However, using 5 events per second, at roughly 3kb per event, we’ve used the Kinesis calculator to calculate the following:</p>
-<br/>
+
+
+<img src="assets/event-stream-to-kinesis.png" alt="Total Events Per Minute">
+
+
+<h3>Costs</h3>
 <br/>
 <p>Firehosing is priced per GB of ingested data $0.029 per GB.</p>
 <br/>
