@@ -63,10 +63,10 @@
     <p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
     <p>It was constructed to overcome the following problems</p>
 
-    <p>1.	The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against.
-        2.	Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes
-        3.	Multiple processes were attempting to answer similar “change” questions using contradictory logic.
-        </p>
+    <p>1.	The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against. </p>
+     <p>   2.	Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes </p>
+     <p>   3.	Multiple processes were attempting to answer similar “change” questions using contradictory logic. </p>
+        
 
 
 <p>
