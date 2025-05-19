@@ -58,9 +58,9 @@
 <h2>What is the Event Stream?</h2>
 <p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
 <p>It was constructed to overcome the following problems:</p>
-<p>The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against.</p>
-<p>Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes</p>
-<p>Multiple processes were attempting to answer similar “change” questions using contradictory logic.</p>
+<p>1. The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against.</p>
+<p>2. Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes</p>
+<p>3. Multiple processes were attempting to answer similar “change” questions using contradictory logic.</p>
 <p>The intention of the event stream was to build a single source of truth that could publish what happened, as it happened; and then notify products of the exact changes that had occurred.</p>
 <p>There are currently 6 products within the Quest eco-system that use the EventStream today in production to respond to changes as they occur:</p>
 <p><b>AssignmentAudit</b></p>
@@ -160,6 +160,7 @@
 
 
 
+
 <h3>ChangeSet and Affected entities examples</h3>
 <p>The following example comes from a real record created on April 5th, 2020.</p>
 <br/>
@@ -186,7 +187,7 @@
 <h2>How the EventStream is used today in the Quest application</h2>
 <p>Once a row has been written to the EventSource table, there is a further trigger which cross references the table to a whitelist of downstream products that need to be notified when certain changes occur.  For PersonRestriction, there are 2 downstream products:</p>
 <br/>
-<img src="assets/downstream-products.png" alt="downstream products">
+<img src="assets/downsteam-products.png" alt="downstream products">
 <br/>
 <p>Based upon the example changeset in the example above, restrictions will re-evaluate the Person for any outstanding restrictions now that this one has been ended.  It will use the AffectedEntity column to re-evaluate person 8584947.</p>
 <p>AssignmentAudit will log that a person who had been reserved was subsequently eliminated. It will convert the changeset into an audit record along with the EmployeeId and TriggerInvokeTimestamp. It will then mark them against the AffectedEntity of type 3 (Assignment) Assignment Id 220014024.</p>
@@ -214,14 +215,58 @@
 <p>From examining the data over the past 18 months, we can see that the EventStream generates approx. 10 million events per month.</p>
 <p>Over the past 90 days, the events have averaged per day:</p>
 
-
+<table border="1">
+    <thead>
+      <tr>
+        <th>Weekday</th>
+        <th>Average events</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Monday</td>
+        <td>404363</td>
+      </tr>
+      <tr>
+        <td>Tuesday</td>
+        <td>471652</td>
+      </tr>
+      <tr>
+        <td>Wednesday</td>
+        <td>454469</td>
+      </tr>
+      <tr>
+        <td>Thursday</td>
+        <td>441894</td>
+      </tr>
+      <tr>
+        <td>Friday</td>
+        <td>373819</td>
+      </tr>
+      <tr>
+        <td>Saturday</td>
+        <td>88863</td>
+      </tr>
+      <tr>
+        <td>Sunday</td>
+        <td>82181</td>
+      </tr>
+    </tbody>
+  </table>
 
 
 
 <br/>
 <p>On a typical Tuesday (in this example March 24th), the events peak at approx. 3PM GMT (9AM CST) with roughly 40,000 events over a 60 min period.</p>
 <br/>
+
+
+<img src="assets/total-events-per-hour.png" alt="Total Events Per Hour">
+
+
 <p>And in that peak hour, the events are distributed like so:</p>
+
+<img src="assets/total-events-per-minute.png" alt="Total Events Per Minute">
 <br/>
 <p>Apart from a couple of spikes, we don’t really go above 200 per minute or approx. 3 per second at peak running hour.</p>
 <p>The numbers for the event stream patterns are consistent on an hour per day, day per week basis, week to week basis.  The only outlier in the data so far seem to be a roughly 10% drop off in March 2020 activity, presumably due to covid-19 fallout.</p>
