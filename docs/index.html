@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>What is the Event Stream?</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            max-width: 900px;
+        }}
+        h1, h2, h3 {{
+            color: #333;
+        }}
+        pre {{
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }}
+        code {{
+            font-family: Consolas, monospace;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+        }}
+        a {{
+            color: #0366d6;
+            text-decoration: none;
+        }}
+        a:hover {{
+            text-decoration: underline;
+        }}
+        ul {{
+            padding-left: 20px;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }}
+        table, th, td {{
+            border: 1px solid #ccc;
+        }}
+        th, td {{
+            padding: 8px;
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    <h1>What is the Event Stream?</h1>
+
+    <h2>Purpose</h2>
+    <p>The purpose of this document is to centralise the knowledge of the EventStream and its capabilities so that team members can gain a holistic understanding of its capabilities and possible future use.</p>
+
+    <h2>What is the Event Stream?</h2>
+    <p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
+    <p>It was constructed to overcome problems such as performance overheads and inconsistency across multiple historical systems. The goal was to build a single source of truth to notify products of changes.</p>
+    <p>Products using Event Stream: AssignmentAudit, ConfidentialAccess, PersonReadModel, QuestReports, Restrictions, SOLR</p>
+
+    <h2>How the EventStream is produced, built, and runs</h2>
+    <p>The event stream uses PowerShell to scan DDL and foreign key relationships, generating SQL triggers that compare new vs old rows. The stream outputs to a single <code>EventSource</code> table, which is processed and distributed.</p>
+    <img src="assets/event-stream-architecture.png" alt="Event Stream Processing Diagram">
+
+    <h2>EventSource Table Schema</h2>
+    <table>
+        <tr><th>Column</th><th>Purpose</th><th>Notes</th></tr>
+        <tr><td>Id</td><td>Unique ID of the event</td><td>Primary key</td></tr>
+        <tr><td>EventType</td><td>Insert, Update, Delete</td><td>Type of change</td></tr>
+        <tr><td>TransactionTable</td><td>Name of the affected table</td><td>Source</td></tr>
+        <tr><td>TransactionTableRow</td><td>Primary key ID</td><td>Row identifier</td></tr>
+        <tr><td>ChangeSet</td><td>JSON representing changes</td><td>Old/New values</td></tr>
+        <tr><td>EmployeeId</td><td>Who made the change</td><td>-</td></tr>
+        <tr><td>TriggerInvokeTimestamp</td><td>Timestamp of change</td><td>-</td></tr>
+        <tr><td>TransactionId</td><td>Correlation ID</td><td>Links grouped changes</td></tr>
+        <tr><td>AffectedEntities</td><td>Root-level relationships</td><td>e.g. Person, Company</td></tr>
+    </table>
+
+    <h2>ChangeSet & AffectedEntities JSON Example</h2>
+    <pre><code>[
+{{
+    "RootEntityTypeId": 1,
+    "RootEntityId": 8584947
+}},
+{{
+    "RootEntityTypeId": 2,
+    "RootEntityId": 220014024
+}},
+{{
+    "RootEntityTypeId": 3,
+    "RootEntityId": 2001036837
+}}]</code></pre>
+
+    <h2>Sample Queries</h2>
+    <pre><code>-- Get all changes for a specific transaction
+SELECT * FROM eventstream.eventsource
+WHERE TransactionId = '3539A5B7-863C-4575-A260-D01565D963F0'
+ORDER BY 1 DESC;
+
+-- Jobs with primary indicator switched from 1 to 0 in last 7 days
+SELECT COUNT(*) FROM eventstream.eventsource
+WHERE TriggerInvokeTimestamp > '20200401'
+AND TransactionTable = 'PersonJob'
+AND ChangeSet LIKE '%"ColName":"PrimaryIndicator","New":"0","Old":"1"%';</code></pre>
+
+    <h2>Current Usage in Quest</h2>
+    <p>The Event Stream powers downstream products by triggering processors on data changes. Each product reacts based on a whitelist of entities it subscribes to. This decouples the systems and removes redundant polling.</p>
+
+    <h2>Data Volumes</h2>
+    <p>Roughly 10M events/month. Peak rates are ~3/sec. Load patterns are predictable and manageable. Example chart:</p>
+    <img src="assets/total-events-per-hour.png" alt="Event Volume Chart">
+
+    <h2>Getting Data into the Lake</h2>
+    <p>Using AWS DMS to publish EventStream to Kinesis → Firehose → S3. Instances typically T2 or C4 class. Estimated cost: ~$11/mo for Kinesis.</p>
+    <img src="assets/kinesis-architecture.png" alt="Kinesis Architecture">
+
+    <h2>Working with the EventStream in S3</h2>
+    <p>Glue and Athena can crawl and process the streamed JSON files. This allows efficient querying and transformations. Flattened structure example:</p>
+    <img src="assets/flattened-table-example.png" alt="Flattened ChangeSet Table">
+
+    <h2>Redshift Federated Query</h2>
+    <p>Alternative design proposes replicating Quest to Aurora and using Redshift Federated Query to directly query operational data for BI needs, bypassing some ETL stages.</p>
+
+    <p>Learn more at <a href="https://docs.aws.amazon.com/redshift/latest/dg/federated-overview.html" target="_blank">Redshift Federated Query Overview</a>.</p>
+
+</body>
+</html>
