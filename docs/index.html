@@ -2,163 +2,222 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>What is the Event Stream?</title>
+    <title>Event Stream Documentation</title>
     <style>
-        body {{
+        body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
             margin: 40px;
             max-width: 900px;
-        }}
-        h1, h2, h3 {{
+        }
+        h1, h2, h3 {
             color: #333;
-        }}
-        pre {{
+        }
+        pre {
             background: #f4f4f4;
             padding: 10px;
             border-radius: 4px;
             overflow-x: auto;
-        }}
-        code {{
+        }
+        code {
             font-family: Consolas, monospace;
-        }}
-        img {{
+        }
+        img {
             max-width: 100%;
             height: auto;
             margin: 20px 0;
-        }}
-        a {{
+        }
+        a {
             color: #0366d6;
             text-decoration: none;
-        }}
-        a:hover {{
+        }
+        a:hover {
             text-decoration: underline;
-        }}
-        ul {{
+        }
+        ul {
             padding-left: 20px;
-        }}
-        table {{
+        }
+        table {
             border-collapse: collapse;
             width: 100%;
             margin: 20px 0;
-        }}
-        table, th, td {{
+        }
+        table, th, td {
             border: 1px solid #ccc;
-        }}
-        th, td {{
+        }
+        th, td {
             padding: 8px;
             text-align: left;
-        }}
+        }
     </style>
 </head>
 <body>
-    <h1>What is the Event Stream?</h1>
-
-
-
-    <h2>Purpose</h2>
-    <p>The purpose of this document is to centralise the knowledge of the EventStream and its capabilities so that team members can gain a holistic understanding of its capabilities and possible future use.</p>
-
-    <h2>What is the Event Stream?</h2>
-    <p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
-    <p>It was constructed to overcome the following problems</p>
-
-    <p>1.	The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against. </p>
-     <p>   2.	Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes </p>
-     <p>   3.	Multiple processes were attempting to answer similar “change” questions using contradictory logic. </p>
-        
-
-
-<p>
-    The intention of the event stream was to build a single source of truth that could publish what happened, as it happened; and then notify products of the exact changes that had occurred.
-There are currently 6 products within the Quest eco-system that use the EventStream today in production to respond to changes as they occur:
-•	AssignmentAudit
-•	ConfidentialAccess
-•	PersonReadModel
-•	QuestReports
-•	Restrictions
-•	SOLR
-
-</p>
-
+<br/>
+<h2>Purpose</h2>
+<p>The purpose of this document is to centralise the knowledge of the EventStream and its capabilities so that team members can gain a holistic understanding of its capabilities and possible future use.</p>
+<h2>What is the Event Stream?</h2>
+<p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
+<p>It was constructed to overcome the following problems:</p>
+<p>The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against.</p>
+<p>Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes</p>
+<p>Multiple processes were attempting to answer similar “change” questions using contradictory logic.</p>
+<p>The intention of the event stream was to build a single source of truth that could publish what happened, as it happened; and then notify products of the exact changes that had occurred.</p>
+<p>There are currently 6 products within the Quest eco-system that use the EventStream today in production to respond to changes as they occur:</p>
+<p>AssignmentAudit</p>
+<p>ConfidentialAccess</p>
+<p>PersonReadModel</p>
+<p>QuestReports</p>
+<p>Restrictions</p>
+<p>SOLR</p>
+<br/>
 <h2>How the EventStream is produced</h2>
-<p>How its built
-    The event stream uses a process built in PowerShell to analyze all tables in our quest database, including their foreign key relationships to one another. This process then generates triggers for each table that can compare a newly modified row with its predecessor and derive the changes that occurred, column by column.
-    All the code used in the EventStream code is automatically generated through Powershell scripts that can detect change to DDL.  
-    As the schema evolves, the event stream triggers are regenerated automatically to reflect the altered DDL.   This is not a Quest specific solution, an event stream can be produced for any of our relational databases that use integers as their primary keys.
-    </p>
-
-    <p>
-        How it runs
-At runtime, the jumping off point is a single table called EventSource.  All 591 tables of Quest are funnelled into this single table structure in the order in which the events are produced. Each table pushes a payload of the changed columns to a processor queue as part of the transaction commit on our SR replication of the Quest database.
-It is then picked up by a processor which can trace the root entities of each record. 
-The final output is then persisted to a table called the EventSource table which is the raw stream of all events. 
-When this happens, it triggers a process to cross reference each event with a service list that determines which products need to be notified of changes.  E.g. a change to CompanyLocationPostalAddress is sent to PersonReadModel, AssignmentAudit and QuestReports.
-This entire process gives us a single log table that contains every change to the Quest data since December 2018.
-
-    </p>
-
-    <h2>Breakdown of each column and its purpose</h2>
-    <p>There are 9 columns in each event, and they all serve equally important purposes</p>
-    <table>
-        <tr><th>Column</th><th>Purpose</th><th>Notes</th></tr>
-        <tr><td>Id</td><td>Unique ID of the event</td><td>Primary key</td></tr>
-        <tr><td>EventType</td><td>Insert, Update, Delete</td><td>Type of change</td></tr>
-        <tr><td>TransactionTable</td><td>Name of the affected table</td><td>Source</td></tr>
-        <tr><td>TransactionTableRow</td><td>Primary key ID</td><td>Row identifier</td></tr>
-        <tr><td>ChangeSet</td><td>JSON representing changes</td><td>Old/New values</td></tr>
-        <tr><td>EmployeeId</td><td>Who made the change</td><td>-</td></tr>
-        <tr><td>TriggerInvokeTimestamp</td><td>Timestamp of change</td><td>-</td></tr>
-        <tr><td>TransactionId</td><td>Correlation ID</td><td>Links grouped changes</td></tr>
-        <tr><td>AffectedEntities</td><td>Root-level relationships</td><td>e.g. Person, Company</td></tr>
-    </table>
-
-    <h2>ChangeSet & AffectedEntities JSON Example</h2>
-    <pre><code>[
-{{
-    "RootEntityTypeId": 1,
-    "RootEntityId": 8584947
-}},
-{{
-    "RootEntityTypeId": 2,
-    "RootEntityId": 220014024
-}},
-{{
-    "RootEntityTypeId": 3,
-    "RootEntityId": 2001036837
-}}]</code></pre>
-
-    <h2>Sample Queries</h2>
-    <pre><code>-- Get all changes for a specific transaction
-SELECT * FROM eventstream.eventsource
-WHERE TransactionId = '3539A5B7-863C-4575-A260-D01565D963F0'
-ORDER BY 1 DESC;
-
--- Jobs with primary indicator switched from 1 to 0 in last 7 days
-SELECT COUNT(*) FROM eventstream.eventsource
-WHERE TriggerInvokeTimestamp > '20200401'
-AND TransactionTable = 'PersonJob'
-AND ChangeSet LIKE '%"ColName":"PrimaryIndicator","New":"0","Old":"1"%';</code></pre>
-
-    <h2>Current Usage in Quest</h2>
-    <p>The Event Stream powers downstream products by triggering processors on data changes. Each product reacts based on a whitelist of entities it subscribes to. This decouples the systems and removes redundant polling.</p>
-
-    <h2>Data Volumes</h2>
-    <p>Roughly 10M events/month. Peak rates are ~3/sec. Load patterns are predictable and manageable. Example chart:</p>
-    <img src="assets/total-events-per-hour.png" alt="Event Volume Chart">
-
-    <h2>Getting Data into the Lake</h2>
-    <p>Using AWS DMS to publish EventStream to Kinesis → Firehose → S3. Instances typically T2 or C4 class. Estimated cost: ~$11/mo for Kinesis.</p>
-    <img src="assets/kinesis-architecture.png" alt="Kinesis Architecture">
-
-    <h2>Working with the EventStream in S3</h2>
-    <p>Glue and Athena can crawl and process the streamed JSON files. This allows efficient querying and transformations. Flattened structure example:</p>
-    <img src="assets/flattened-table-example.png" alt="Flattened ChangeSet Table">
-
-    <h2>Redshift Federated Query</h2>
-    <p>Alternative design proposes replicating Quest to Aurora and using Redshift Federated Query to directly query operational data for BI needs, bypassing some ETL stages.</p>
-
-    <p>Learn more at <a href="https://docs.aws.amazon.com/redshift/latest/dg/federated-overview.html" target="_blank">Redshift Federated Query Overview</a>.</p>
+<h3>How its built</h3>
+<p>The event stream uses a process built in PowerShell to analyze all tables in our quest database, including their foreign key relationships to one another. This process then generates triggers for each table that can compare a newly modified row with its predecessor and derive the changes that occurred, column by column.</p>
+<p>All the code used in the EventStream code is automatically generated through Powershell scripts that can detect change to DDL.</p>
+<p>As the schema evolves, the event stream triggers are regenerated automatically to reflect the altered DDL.   This is not a Quest specific solution, an event stream can be produced for any of our relational databases that use integers as their primary keys.</p>
+<h3>How it runs</h3>
+<p>At runtime, the jumping off point is a single table called EventSource.  All 591 tables of Quest are funnelled into this single table structure in the order in which the events are produced. Each table pushes a payload of the changed columns to a processor queue as part of the transaction commit on our SR replication of the Quest database.</p>
+<p>It is then picked up by a processor which can trace the root entities of each record.</p>
+<p>The final output is then persisted to a table called the EventSource table which is the raw stream of all events.</p>
+<p>When this happens, it triggers a process to cross reference each event with a service list that determines which products need to be notified of changes.  E.g. a change to CompanyLocationPostalAddress is sent to PersonReadModel, AssignmentAudit and QuestReports.</p>
+<p>This entire process gives us a single log table that contains every change to the Quest data since December 2018.</p>
+<br/>
+<h2>Breakdown of each column and its purpose</h2>
+<p>There are 9 columns in each event, and they all serve equally important purposes</p>
+<br/>
+<h3>ChangeSet and Affected entities examples</h3>
+<p>The following example comes from a real record created on April 5th, 2020.</p>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<h2>Sample Queries</h2>
+<p>Having the event stream in the transactional system allows us to write simple enough queries that allow us to traverse the history of changes from one single table.  The following queries were ran on the Quest DB on April 8st:</p>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<h2>How the EventStream is used today in the Quest application</h2>
+<p>Once a row has been written to the EventSource table, there is a further trigger which cross references the table to a whitelist of downstream products that need to be notified when certain changes occur.  For PersonRestriction, there are 2 downstream products:</p>
+<br/>
+<br/>
+<p>Based upon the example changeset in the example above, restrictions will re-evaluate the Person for any outstanding restrictions now that this one has been ended.  It will use the AffectedEntity column to re-evaluate person 8584947.</p>
+<p>AssignmentAudit will log that a person who had been reserved was subsequently eliminated. It will convert the changeset into an audit record along with the EmployeeId and TriggerInvokeTimestamp. It will then mark them against the AffectedEntity of type 3 (Assignment) Assignment Id 220014024.</p>
+<p>In this way, the EventStream proactively pushes out messages to products as pertinent events arise.  This has eliminated the thundering herd effect that has occurred in the past when multiple resource-intensive batch processes have attempted to interrogate the Quest database and Quest History databases at the same time.</p>
+<p>Today the event stream has replaced the quest history database which previously captured a copy of every version of every roll in every table in the quest database.  When a developer is attempting to obtain the history of a record, they no longer need to view different versions of the row and figure out a process for understanding the deltas.</p>
+<p>We also can replay these events in sequence into an older copy of Quest. If nightly backups are taken of the production database, we have the ability to sync a copy of Quest to a declared point in time.   Each event contains enough information to be converted back to an Insert, Update or Delete statements.  We have a process that can iterate through them from a given start point up to an end point. This process was used to sync data from Production back to Production Support as part of the Workday HR effort in 2019.</p>
+<p>However, all the products that currently use the event stream must do so through SQL Server message broker each product gets its own broker service.</p>
+<p>This is not sustainable or scalable for future use. We intend for some of these events to be represented as nodes and relationships in graph databases, but we do not expect those graph databases to query a relational database.</p>
+<p>As part of the initial design for the event stream we also intended to allow the database here to publish these events outside of SQL Server, so that they can be consumed by products that will not have any interaction whatsoever with our database layer.</p>
+<p>Our identified mechanism for doing this is a combination of the AWS Database Migration Service and Kinesis Firehose.</p>
+<br/>
+<br/>
+<p>The above diagram is from a POC that we built in the summer of 2019.</p>
+<p>It illustrates how we could use the event stream to proactively “sync” events to a graph database, to be used for products such as restrictions or relationships.  The events coming from the event stream are read from the Quest database by the Database Migration Service, with each row subsequently converted into a Kinesis message then pushed to a Kinesis DataStream.  The messages are then simultaneously pushed to Lambda while also using Kinesis Firehose to push them to an S3 bucket for long term storage.</p>
+<p>Putting aside the Neo4J use case for the moment; this approach demonstrates how we can leverage the Database Migration Service and Kinesis to push the Event Stream events to the Data Lake in near real time by following steps 1 and 4 in the diagram.</p>
+<br/>
+<br/>
+<h2>EventStream data volumes</h2>
+<p>Within the various POC’s performed against the EventStream, questions often centre on how the DMS/Kinesis combination would handle the EventStream.</p>
+<p>From examining the data over the past 18 months, we can see that the EventStream generates approx. 10 million events per month.</p>
+<p>Over the past 90 days, the events have averaged per day:</p>
+<br/>
+<p>On a typical Tuesday (in this example March 24th), the events peak at approx. 3PM GMT (9AM CST) with roughly 40,000 events over a 60 min period.</p>
+<br/>
+<p>And in that peak hour, the events are distributed like so:</p>
+<br/>
+<p>Apart from a couple of spikes, we don’t really go above 200 per minute or approx. 3 per second at peak running hour.</p>
+<p>The numbers for the event stream patterns are consistent on an hour per day, day per week basis, week to week basis.  The only outlier in the data so far seem to be a roughly 10% drop off in March 2020 activity, presumably due to covid-19 fallout.</p>
+<br/>
+<br/>
+<h2>Getting the EventStream into the Data Lake</h2>
+<p>To use DMS, we enable CDC on the Quest database and create a replication task that replicates the rows from the EventStream onto Kinesis, using a Replication Instance.</p>
+<p>Database Migration Service uses an EC2 service with an AWS agent dependent upon the type of task that is being invoked. It offers the T2 ($0.036 -$0.292 per hour multi-AZ), C4 ($0.308-$2.47) and R4 ($0.41-$6.60) classes for the Replication Instance.  DMS documentation is unclear on the size of instance that should be used in production.  However, it recommends T2 for dev and QA environments.</p>
+<p>The storage of the replication instance is used for caching of transaction log data for long running transactions. The rate at which the DMS can process the events is tied heavily to the size of instance chosen.  However, if the DMS is overwhelmed, it simply pauses reading from the transaction log of the source database until it has caught up.</p>
+<p>We may be ok with T2 for production grade replication of the event stream as we would be reading from a single table which is resource constrained to a single thread; additionally, there is no complicated mapping of the records.  We are simply packaging each row from the database table into a Kinesis record, which would be less memory intensive that if we were manipulating the structure of the payloads.</p>
+<p>Storage is charged at $0.23 per gb per month in a multi AZ instance.  For a T2 instance, the storage size is 50Gb (so, $11.50 per month)</p>
+<p>Due to the relatively low data volumes coming from quest, we can extrapolate that at 5 events per second, we would reach 13 million in a month.  This would be 25% higher than any month so far.</p>
+<p>However, using 5 events per second, at roughly 3kb per event, we’ve used the Kinesis calculator to calculate the following:</p>
+<br/>
+<br/>
+<p>Firehosing is priced per GB of ingested data $0.029 per GB.</p>
+<br/>
+<br/>
+<h2>Working with the EventStream in the Data Lake</h2>
+<p>If we attempt to iterate through the quest data, table by table, we will need to have a process per table (presumably via a python script) that can clean the table and move to a raw bucket and apply to the existing data in the data lake.</p>
+<p>Because each table has different structures, each one will require a glue job to execute the python script. The job will require a cloudformation stack, a deployment pipeline and associated tests for all 4. We will also need to have a process for when the quest schema changes, as it does, on a quarterly basis.  There are 620 tables in Quest, with more to be added via the OCE functionality coming in from Quest Finance.  This mode changes with each release, so we will also need to be able to successfully handle multiple versions of the quest data model.</p>
+<p>The major advantage of streaming the data into the lake from the EventStream is that it allows us to have a single process that can interpret the incoming events against a single known pattern (the event source structure) effectively as they are produced.</p>
+<p>This would greatly reduce the effort required to ingest the Quest database; and process the deltas. We should also be conscious that the tables do not move in concert with one another.  A person entity is made up of 59 different tables that update at different paces.</p>
+<p>By using the events from the event stream, we can use a single master process that can interpret the files that have been firehose into S3:</p>
+<p>Kinesis Firehoses in the data in 1mb files</p>
+<p>A glue crawler can identify a single schema in these files.</p>
+<p>We can load the S3 object (1mb) into memory and group by each affected table in the file (e.g. 5 person rows, 15 person jobs, 3, person restriction).</p>
+<p>For each affected table, we can locate the object that holds the “latest” version of that row in the lake (e.g. access the folders for person, personjob, person restriction)</p>
+<p>We can then create the next version of the record by applying the changes from the eventstream record with an in memory version of the previous row. (e.g. load the object holding personrestriction 1234 into a dataframe and apply the change)</p>
+<p>We can then persist the latest version of the object with the change.</p>
+<p>We can also mark the previous version as “not current”</p>
+<br/>
+<p>By having a single worker process that can apply these changes we would have something that is more testable and more manageable in production. Changes and additions to the Quest data model would have not a material effect on this process, as the eventstream data structure does not change from release to release.</p>
+<p>We also significantly reduce the cost of storage and compute needed to maintain the Quest data within the data lake. By only ingesting the new data into the lake, we avoid extraneous, redundant data (the person root table alone has 124 columns)</p>
+<br/>
+<h2>Flattening the data within the data lake</h2>
+<p>Alongside syncing the data in the lake from the event stream, we could also flatten out the events themselves for fast rollup style queries.</p>
+<p>Rather than interrogating the nested json within each row, we can flatten out in order to make the rows indexable.  This would mean that the changeset from the earlier examples would go from this JSON blob:</p>
+<p>[{"ColName":"TransactionId","New":"54BAB960-C3B2-4CB6-A08F-AAA11FB0F16E","Old":"A0018218-B959-4F79-9D01-CBF25A65F73D"},{"ColName":"PersonRestrictionCessationReasonCategoryId","New":"6","Old":null},{"ColName":"EndDate","New":"2020-04-05 16:47:34.4164179","Old":"2020-05-03 15:25:41.4689487"},{"ColName":"UpdEmpEPID","New":"9626","Old":null},{"ColName":"PersonRestrictionUpdDT","New":"2020-04-05 16:47:34.4634179","Old":"2020-04-03 15:25:41.4909508"},{"ColName":"PersonRestrictionVersionNumber","New":"2","Old":"1"}]</p>
+<br/>
+<p>To This table structure:</p>
+<br/>
+<p>In a similar vein, we could break out each affected entity so it would have its own copy of the row.</p>
+<br/>
+<br/>
+<p>Once we had the data flattened out like this, the sample queries from above become more generic:</p>
+<p>--how many jobs had their primary indicator switched from 1 to 0 in the past 7 days?</p>
+<p>select count(*) from eventstream.eventsource</p>
+<p>where TriggerInvokeTimestamp > '20200318'</p>
+<p>and TransactionTable = 'PersonJob'</p>
+<p>and ColumnName = 'PrimaryIndicator'</p>
+<p>and NewValue = '1'</p>
+<p>and OldValue = '0'</p>
+<br/>
+<br/>
+<p>select count(*) from eventstream.eventsource</p>
+<p>where TriggerInvokeTimestamp > '20200318'</p>
+<p>and TransactionTable = 'Person'</p>
+<p>and ColumnName = 'ExecutiveEntityRestrictionSnapshotCategoryId'</p>
+<p>and NewValue = '3'</p>
+<p>and OldValue = null</p>
+<br/>
+<br/>
+<p>--Day by Day breakdown of the above query</p>
+<p>select Day(TriggerInvokeTimestamp) as DateOfChange,count(1) as ChangeCount from eventstream.eventsource</p>
+<p>where TriggerInvokeTimestamp > '20200318'</p>
+<p>and TransactionTable = 'Person'</p>
+<p>and ColumnName = 'ExecutiveEntityRestrictionSnapshotCategoryId'</p>
+<p>and NewValue = '3'</p>
+<p>group by Day(TriggerInvokeTimestamp)</p>
+<br/>
+<p>Once we’ve done this, we could then perform aggregations on the data and persist the outputs into the data warehouse.</p>
+<p>By persisting the flattened data in S3, Data Scientists could also use Athena to execute the above queries.</p>
+<br/>
+<h2>Out of the box idea for Redshift</h2>
+<p>Another option could be to not push this data to the data lake, and instead leverage the federated querying capabilities of Redshift.</p>
+<br/>
+<p>Federated Query allows you to incorporate live data as part of your business intelligence (BI) and reporting applications. The intelligent optimizer in Redshift pushes down and distributes a portion of the computation directly into the remote operational databases to speed up performance by reducing data moved over the network. Redshift complements query execution, as needed, with its own massively parallel processing capabilities. Federated Query also makes it easy to ingest data into Redshift by letting you query operational databases directly, applying transformations on the fly, and loading data into the target tables without requiring complex ETL pipelines.</p>
+<br/>
+<p>Using Redshift Federated Query ()
+You can now also access data in RDS and Aurora PostgreSQL stores directly from your Redshift data warehouse. In this way, you can access data as soon as it is available. Straight from Redshift, you can now perform queries processing data in your data warehouse, transactional databases, and data lake, without requiring ETL jobs to transfer data to the data warehouse.</p>
+<p>Redshift leverages its advanced optimization capabilities to push down and distribute a significant portion of the computation directly into the transactional databases, minimizing the amount of data moving over the network.</p>
+<br/>
+<p>The idea here would be to use the Database migration service to sync the events from Quest in SQL Server to a copy of Quest in Aurora (Redshift federated querying is not compatible with SQL Server). The data in Aurora would then retain its structure and referential integrity. This data could then be ingested directly into Redshift and shaped according to the redshift schema, then used for the BI queries.   This would avoid the need for costly glue jobs to join and shape the quest data.</p>
+<p>As part of this process, we could also use the S3 Export functionality to push this data from Redshift into the data lake for further use by other consumers.</p>
 
 </body>
 </html>
