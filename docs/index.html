@@ -70,6 +70,71 @@
 <p><b>Restrictions</b></p>
 <p><b>SOLR</b></p>
 <br/>
+
+<p>Each product reponds differently to the change. Consider a Company that has multiple offices, each of which have multiple employees. A person working at an office location for a company is stored within a highly normalisedrecord called PersonJobCompanyLocationUsage. When the Person moves from the New Jersey to the New York office, this can be a simple record update inwhich the PersonJobCompanyLocationUsage changes from one office id to another. The nature of a distriburted systems means that multiple products must all now update to reflect this change: </p>
+
+<p>The Search Product needs to reflect this in searches for the Person</p>
+<p>The audit log needs to record the change</p>
+<p>Business intelligenc products need to udpate</p>
+<p>Any employees who had set alerts for changes to a particular person or company need to be notified.</p>
+
+<p>Again, the nature of a distrubuted system means that usually a message will be placed on a queue and various products will interrogate the transactional database for information related to the change</p>
+<p>Because different products are built by different teams, some of which have different stacks, and approaches, we can end up woith a thundering herd effect post change</p>
+
+
+<img src="assets/post-processing-components.png" alt="Post Processing Components">
+
+
+<p>
+    The current state of post-processing poses several significant challenges:
+</p>
+<p>
+We lack a unified, holistic approach to handling post-processing activities. There is no single source of truth across the system, which leads to inconsistencies and inefficiencies. Each service independently determines what work needs to be performed, resulting in fragmented logic and duplicated effort. Additionally, the Quest database is the only system currently preserving the history of past events. While there is a mirrored version, QuestHistory, it replicates Quest entirely and contains an overwhelming 591 tables, which further complicates data management and system clarity.
+</p>
+
+<img src="assets/why-is-this-a-problem.png" alt="Post Processing Components">
+
+
+<h1>The Root Problem</h1>
+
+    <p>
+        The <strong>root problem</strong> lies in our over-reliance on costly, complex SQL Agent jobs to understand basic operational outcomes — essentially to answer the question, “What just happened?”
+    </p>
+
+    <p>
+        These jobs are expensive not just to develop and maintain, but also to run. Their inefficiency is compounded by the fact that they all depend on <strong>QuestHistory</strong> as the canonical source for past events. However, QuestHistory itself offers little actual insight — it consists solely of temporal tables, capturing every version of every row across 591 tables, without any semantic layer or interpretive structure.
+    </p>
+
+    <p>
+        Because of this, the jobs must each independently extract and derive “meaning” from raw historical data. This means:
+    </p>
+
+    <ul>
+        <li>There’s no intrinsic understanding of change or impact within QuestHistory.</li>
+        <li>Each job has to determine for itself what changed, and what the implications are.</li>
+        <li>The jobs operate in silos, unaware of one another, redundantly asking the same questions and duplicating processing effort without sharing results.</li>
+    </ul>
+
+    <p>
+        This fragmented and repetitive model results in inefficiency, increased operational cost, and a lack of system-wide clarity.
+    </p>
+
+
+    <h1>Why Is This a Problem?</h1>
+
+  <ul>
+    <li><strong>Time Delay</strong> – Up to 10 minutes for security changes to take effect.</li>
+    <li><strong>AssignmentAudit</strong> – 75% of processing time is spent just figuring out the work.</li>
+    <li>Massive codebase – Tens of thousands of lines of code.</li>
+    <li>History tables are temporal – They store every version of every row in every table.</li>
+    <li><strong>Data size is ballooning</strong> – History now totals 600GB per environment, with 3 environments in production.</li>
+    <li>System does not scale efficiently.</li>
+    <li><strong>Quest History data lacks semantic meaning</strong> – It is not reusable across jobs.</li>
+    <li>Debugging is slow and cumbersome.</li>
+    <li>Jobs are unaware of each other – All independently ask the same questions.</li>
+    <li>Jobs do not know what has happened since their last run – They attempt to reprocess *everything*.</li>
+  </ul>
+
 <h2>How the EventStream is produced</h2>
 <h3>How its built</h3>
 <p>The event stream uses a process built in PowerShell to analyze all tables in our quest database, including their foreign key relationships to one another. This process then generates triggers for each table that can compare a newly modified row with its predecessor and derive the changes that occurred, column by column.</p>
