@@ -123,16 +123,16 @@ We lack a unified, holistic approach to handling post-processing activities. The
     <h1>Why Is This a Problem?</h1>
 
   <ul>
-    <li><strong>Time Delay</strong> Up to 10 minutes for security changes to take effect.</li>
-    <li><strong>AssignmentAudit</strong>75% of processing time is spent just figuring out the work.</li>
-    <li><strong>Massive codebase  Tens of thousands of lines of code.</strong></li>
-    <li><strong>History tables are temporal</strong> – They store every version of every row in every table.</li>
-    <li><strong>Data size is ballooning</strong> – History now totals 600GB per environment, with 3 environments in production.</li>
+    <li><strong>Time Delay</strong> - Up to 10 minutes for security changes to take effect.</li>
+    <li><strong>AssignmentAudit</strong> - 75% of processing time is spent just figuring out the work.</li>
+    <li><strong>Massive codebase</strong> - Tens of thousands of lines of code.</li>
+    <li><strong>History tables are temporal</strong> - They store every version of every row in every table.</li>
+    <li><strong>Data size is ballooning</strong> - History now totals 600GB per environment, with 3 environments in production.</li>
     <li><strong>System does not scale efficiently.</strong></li>
-    <li><strong>Quest History data lacks semantic meaning</strong> – It is not reusable across jobs.</li>
+    <li><strong>Quest History data lacks semantic meaning</strong> - It is not reusable across jobs.</li>
     <li><strong>Debugging is slow and cumbersome.</strong></li>
-    <li><strong>Jobs are unaware of each other </strong> – All independently ask the same questions.</li>
-    <li><strong>Jobs do not know what has happened since their last run </strong>– They attempt to reprocess *everything*.</li>
+    <li><strong>Jobs are unaware of each other </strong> - All independently ask the same questions.</li>
+    <li><strong>Jobs do not know what has happened since their last run </strong> - They attempt to reprocess *everything*.</li>
   </ul>
 
 <h2>How the EventStream is produced</h2>
