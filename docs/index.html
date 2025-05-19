@@ -54,15 +54,19 @@
 <body>
     <h1>What is the Event Stream?</h1>
 
-BLAH BLAH BLAH!!!!!
+
 
     <h2>Purpose</h2>
     <p>The purpose of this document is to centralise the knowledge of the EventStream and its capabilities so that team members can gain a holistic understanding of its capabilities and possible future use.</p>
 
     <h2>What is the Event Stream?</h2>
     <p>The event stream is an append only, immutable log produced in SQL Server based upon events created in the quest database. It was deployed to production in December 2018 as a replacement for the quest history database.</p>
-    <p>It was constructed to overcome problems such as performance overheads and inconsistency across multiple historical systems. The goal was to build a single source of truth to notify products of changes.</p>
-    <p>Products using Event Stream: AssignmentAudit, ConfidentialAccess, PersonReadModel, QuestReports, Restrictions, SOLR</p>
+    <p>It was constructed to overcome the following problems</p>
+
+    <p>1.	The quest database was pushing every version of every row on every table to a QuestHistory database that mirrored the structure of the Quest database 590 tables.  This was costly to maintain and unwieldy to develop against.
+        2.	Significant resources were being expended on attempting to reconstruct state of entities after the fact for historical purposes
+        3.	Multiple processes were attempting to answer similar “change” questions using contradictory logic.
+        </p>
 
     <h2>How the EventStream is produced, built, and runs</h2>
     <p>The event stream uses PowerShell to scan DDL and foreign key relationships, generating SQL triggers that compare new vs old rows. The stream outputs to a single <code>EventSource</code> table, which is processed and distributed.</p>
