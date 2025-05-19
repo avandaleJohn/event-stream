@@ -120,6 +120,11 @@
 <p>Our identified mechanism for doing this is a combination of the AWS Database Migration Service and Kinesis Firehose.</p>
 <br/>
 <br/>
+
+<img src="assets/downstream-products.png" alt="Downstream Products Diagram">
+
+
+
 <p>The above diagram is from a POC that we built in the summer of 2019.</p>
 <p>It illustrates how we could use the event stream to proactively “sync” events to a graph database, to be used for products such as restrictions or relationships.  The events coming from the event stream are read from the Quest database by the Database Migration Service, with each row subsequently converted into a Kinesis message then pushed to a Kinesis DataStream.  The messages are then simultaneously pushed to Lambda while also using Kinesis Firehose to push them to an S3 bucket for long term storage.</p>
 <p>Putting aside the Neo4J use case for the moment; this approach demonstrates how we can leverage the Database Migration Service and Kinesis to push the Event Stream events to the Data Lake in near real time by following steps 1 and 4 in the diagram.</p>
