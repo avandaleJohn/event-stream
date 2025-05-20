@@ -53,6 +53,16 @@
 
 <p>This model inverts the traditional control flow. Instead of services polling the database to ask, “Has anything changed?”, the database itself declares, “Here’s what just happened.” That inversion is powerful — it removes duplication, simplifies logic, and brings clarity to distributed architectures.</p>
 
+<h2>Why We Needed a Change</h2>
+<p>The previous solution relied on maintaining a full clone of our transactional system, duplicating every table into a <code>History</code> schema. Changes were tracked by copying entire rows via SQL Agent jobs and writing bespoke ETL logic to derive meaning. This created:</p>
+<ul>
+  <li>Complexity and fragility across 591 tables</li>
+  <li>Expensive, slow, and redundant batch jobs</li>
+  <li>Inconsistent logic across consumers</li>
+  <li>Delayed visibility into system state</li>
+  <li>A “thundering herd” of consumers querying the same data at once</li>
+</ul>
+
 <p>Our implementation uses <strong>SQL Server Service Broker</strong> as a reliable messaging mechanism. As updates happen in the transactional database (on a replicated server for performance), each change is wrapped in a small, structured message and pushed onto a queue. That message is then processed by a central handler and appended to the <code>EventStream</code> table.</p>
 
 <p>Every table in the system is supported through automatically generated triggers and code that evolves alongside the schema. Each table sends its changes to a shared processor queue, where the root entities (like <strong>Person</strong>, <strong>Company</strong>, <strong>Assignment</strong>, and <strong>PNB</strong>) are derived and attached to the event.</p>
@@ -65,10 +75,12 @@
 </ul>
 
 <img src="assets/just-the-changes.png" alt="Just the changes payload">
-<img src="assets/root-entities-summary.png" alt="Root Entities payload">
-<img src="assets/root-entities-array.png" alt="Root Entity JSON array">
 
-<p>This gives us a unified, immutable log of all activity across the platform — replacing hundreds of history tables with a single, interpretable event source. The benefits are significant:</p>
+
+
+
+<h2>Advantages</h2>
+<p>The event stream gives us an immutable log of all activity across the platform — replacing hundreds of history tables with a single, interpretable event source. The benefits are significant:</p>
 <ul>
   <li><strong>Declutters</strong> the database environment by removing table-level history</li>
   <li>Operates on the <strong>replica</strong>, preserving OLTP performance</li>
@@ -78,15 +90,7 @@
   <li>Empowers each service to respond only to changes that affect them</li>
 </ul>
 
-<h2>Why We Needed a Change</h2>
-<p>The previous solution relied on maintaining a full clone of our transactional system, duplicating every table into a <code>History</code> schema. Changes were tracked by copying entire rows via SQL Agent jobs and writing bespoke ETL logic to derive meaning. This created:</p>
-<ul>
-  <li>Complexity and fragility across 591 tables</li>
-  <li>Expensive, slow, and redundant batch jobs</li>
-  <li>Inconsistent logic across consumers</li>
-  <li>Delayed visibility into system state</li>
-  <li>A “thundering herd” of consumers querying the same data at once</li>
-</ul>
+
 
 <h2>Design Principles</h2>
 <ul>
@@ -158,6 +162,46 @@
 </ul>
 
 <h2>Final Thoughts</h2>
+
+
+
+<h2>Why SQL Server Is the Right Place for the Event Stream</h2>
+
+<p>One of the questions I often get is: why centralize this entire change-streaming mechanism inside SQL Server, rather than distributing it across the individual products themselves?</p>
+
+<p>Having built and run this system in production, I can say with confidence that SQL Server is not only the most logical place to anchor the Event Stream — it’s the only place that has full access to the truth, the semantics, and the timing of what actually occurred.</p>
+
+<h3>The database is the single source of truth</h3>
+<p>Every change — whether it affects a person, a company, or an assignment — originates in SQL Server. That’s where the data lives, and that’s where transactional integrity is guaranteed. Capturing events at the database level ensures that we’re never relying on approximations or secondary interpretations from the products. We know exactly what changed, and when.</p>
+
+<h3>Only SQL Server has full context</h3>
+<p>Capturing events here gives us access to the full before/after state, the user ID who made the change, the transaction boundary, and the table’s foreign key relationships. These details would be either unavailable or prohibitively expensive to reconstruct if we waited until the product tier. We don’t need to infer anything — we know exactly what happened, in real time.</p>
+
+<h3>It removes duplication and fragmentation</h3>
+<p>Before I built this system, every downstream product had its own change logic. One might scan <code>QuestHistory</code>, another might poll for deltas, and a third might cache the state and diff it on a schedule. These were all attempts to answer the same question — <em>what just happened?</em> — but in slightly different, fragile ways. By centralizing that logic in the Event Stream, we answer that question once, correctly, and share the result.</p>
+
+<h3>It enables reliable delivery through Service Broker</h3>
+<p>SQL Server Service Broker gives us transactional, durable message queues built right into the database. That means each change can be dispatched as a structured message to any product that needs to know about it. Every product gets its own queue, and the messages are replayable, ordered, and decoupled. We didn’t need to build a distributed bus — the database already had one.</p>
+
+<h3>It happens on the replica — not on OLTP</h3>
+<p>This entire system runs on a replicated copy of the transactional database, so there’s zero impact to OLTP performance. We get all the benefits of real-time capture without putting any extra load on the primary. That includes trigger logic, message processing, and root entity resolution — all handled safely away from production load.</p>
+
+<h3>It gives us a single, queryable history of everything</h3>
+<p>With every change written to <code>EventSource</code>, we can now query across time, by user, by table, by transaction ID, or by root entity. That’s something <code>QuestHistory</code> could never offer. It’s not just a stream — it’s a ledger, and it’s opened up whole new debugging and traceability workflows across the platform.</p>
+
+<h3>It evolves automatically with the schema</h3>
+<p>Since the entire system is metadata-driven, and the code generation is automated, we can safely track schema changes over time. When a new table is added or a relationship shifts, our PowerShell generators pick it up, update the triggers and resolution paths, and deploy the changes with minimal intervention. That just wouldn’t be feasible in a product-led design.</p>
+
+<h3>It makes the whole system simpler</h3>
+<p>Products don’t have to implement change detection. They don’t have to scan history. They don’t even need to know what changed — the message tells them. This removes whole classes of complexity, code duplication, and operational burden from each consumer.</p>
+
+<p>In short: SQL Server is where the truth lives, where the change occurs, and where the tools exist to interpret and distribute those changes safely and consistently. I centralized the Event Stream here because it’s the most accurate, scalable, and maintainable place to do it — and it’s paid off many times over.</p>
+
+
+
+
+
+
 <p>This event streaming system modernized our legacy SQL infrastructure with real-time change awareness, reproducibility, and auditability — without requiring a complete replatforming effort. It remains a foundational part of our architecture, powering everything from audit logs to user permissions to search indexing.</p>
 
 <p>It’s a strong example of how architectural thinking, automation, and metadata design can create lasting, scalable platforms inside even the most traditional relational environments.</p>
