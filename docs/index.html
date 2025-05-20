@@ -123,6 +123,9 @@
 
 <p>For each table, we could now compute the traversal paths that reliably lead to <code>Person</code>, <code>Company</code>, or <code>Assignment</code>. These traversals were converted into reusable SQL fragments executed at runtime to determine the root entities for any row-level change — powering the <code>AffectedEntities</code> column in the <code>EventSource</code> table.</p>
 
+
+<img src="assets/resolving-root-entities.png" alt="Resolving Root Entities">
+
 <img src="assets/entity-traversal-diagram.png" alt="Root Entity Traversal Diagram">
 
 <h2>EventSource Table Schema</h2>
